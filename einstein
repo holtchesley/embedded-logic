@@ -1,0 +1,184 @@
+;; gorilla-repl.fileformat = 1
+
+;; **
+;;; Let's pick a traditional logic puzzle to tease out.
+;;; 
+;;; Here's one that makes an outrageous claim right off the bat.
+;; **
+
+;; @@
+(ns einstein.teaser
+  (:require [gorilla-plot.core :as plot]
+            [clojure.core.logic :as l]
+            [clojure.core.logic.fd :as fd]
+            ))
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-nil'>nil</span>","value":"nil"}
+;; <=
+
+;; **
+;;; The problem:
+;;; 
+;;; Albert Einstein once posed a brain teaser that he predicted only 2% of the worlds population would be able to solve.
+;;; 
+;;; FACTS:
+;;; 1. There are 5 houses in 5 different colours. 
+;;; 2. In each house lives a person with a different nationality. 
+;;; 3. These 5 owners drink a certain beverage, smoke a certain brand of cigarette and keep a certain pet. 
+;;; 4. No owners have the same pet, brand of cigaratte, or drink.
+;;; 
+;;; CLUES:
+;;; 1. The Brit lives in a red house 
+;;; 2. The Swede keeps a dog 
+;;; 3. The Dane drinks tea 
+;;; 4. The green house is on the left of the white house. 
+;;; 5. The green house owner drinks coffee. 
+;;; 6. The person who smokes Pall Mall keeps birds. 
+;;; 7. The owner of the yellow house smokes Dunhill. 
+;;; 8. The man living in the house right in the center drinks milk 
+;;; 9. The Norwegian lives in the first house. 
+;;; 10. The man who smokes Blend lives next to the one who keeps cats 
+;;; 11. The man who keeps horses lives next to the man who smokes Dunhill 
+;;; 12. The owner who smokes Camel drinks beer 
+;;; 13. The German smokes Marlborough. 
+;;; 14. The Norwegian lives next to the blue house 
+;;; 15. The man who smokes Blend has a neighbour who drinks water.
+;; **
+
+;; @@
+(def colors        [:red       :green    :white  :yellow    :blue        ])
+(def nationalities [:british   :swedish  :danish :norwegian :german      ])
+(def beverages     [:tea       :coffee   :milk   :beer      :water       ])
+(def smokes        [:pall-mall :dunhill  :blend  :camel     :marlborough ])
+(def pets          [:dog       :birds    :cats   :horses    :fish        ])
+
+(defn ri [coll key]
+  (->> coll 
+       (map-indexed vector)
+       (filter (fn [[index item]] (= key item)))
+       first
+       first
+       ))
+
+(def rii
+  (reduce merge {} (map-indexed (fn [i [c n b s p]] 
+                                  {c [0 i] 
+                                   n [1 i] 
+                                   b [2 i] 
+                                   s [3 i] 
+                                   p [4 i]}) 
+                                (map vector colors nationalities beverages smokes pets))
+  ))
+
+(ri pets :dog)
+
+(rii :pall-mall)
+
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>3</span>","value":"3"},{"type":"html","content":"<span class='clj-long'>0</span>","value":"0"}],"value":"[3 0]"}
+;; <=
+
+;; **
+;;; We'll need a way to make a house we only know a few things about
+;; **
+
+;; @@
+(defn vague-house
+  [& traits]
+  (->> traits
+       (map rii)
+       (reduce 
+         (fn [house [slot val]] (assoc house slot val)) 
+         [(l/lvar) (l/lvar) (l/lvar) (l/lvar) (l/lvar)])))
+
+(vague-house :red 
+             :british :milk)
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>0</span>","value":"0"},{"type":"html","content":"<span class='clj-long'>0</span>","value":"0"},{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"},{"type":"html","content":"<span class='clj-unkown'>&lt;lvar:14959985&gt;</span>","value":"<lvar:14959985>"},{"type":"html","content":"<span class='clj-unkown'>&lt;lvar:14959986&gt;</span>","value":"<lvar:14959986>"}],"value":"[0 0 2 <lvar:14959985> <lvar:14959986>]"}
+;; <=
+
+;; **
+;;; We'll need a way to talk about neighbors
+;; **
+
+;; @@
+(defn neighbors 
+  [left right houses ordered]
+  (if ordered
+    (l/fresh [a b c]
+           (l/appendo a b houses)
+           (l/appendo [left right] c b))
+    (l/conde 
+      [(neighbors left right houses true)]
+      [(neighbors right left houses true)])))
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-var'>#&#x27;einstein.teaser/neighbors</span>","value":"#'einstein.teaser/neighbors"}
+;; <=
+
+;; @@
+(defn readable
+  [[c n b s p]]
+  [(colors c) (nationalities n) (beverages b) (smokes s) (pets p)])
+
+(first
+ (map 
+  #(map readable %)
+
+  (let [vars (repeatedly 25 l/lvar)
+      rows (->> vars (partition 5) (map vec) (into []))
+      cols (apply map vector rows)]
+    (l/run* [q]
+       ; Each fact must be in one of the corresponding lists 
+       (l/everyg (fn [v] (fd/in v (fd/domain 0 1 2 3 4))) vars)
+       ; No two houses may have the same person/color/beverage/smoke/pet
+       (l/everyg fd/distinct cols)
+       ; The Brit lives in a red house
+       (l/membero (vague-house :british :red) rows)
+       ;2. The Swede keeps a dog 
+       (l/membero (vague-house :swedish :dog) rows)
+       ;3. The Dane drinks tea 
+       (l/membero (vague-house :danish :tea) rows)
+	   ;4. The green house is on the left of the white house. 
+       (neighbors (vague-house :green) (vague-house :white) rows true)
+       ;5. The green house owner drinks coffee. 
+	   (l/membero (vague-house :green :coffee) rows)
+       ;6. The person who smokes Pall Mall keeps birds. 
+       (l/membero (vague-house :pall-mall :birds) rows)
+       ;7. The owner of the yellow house smokes Dunhill.
+       (l/membero (vague-house :yellow :dunhill) rows)
+       ;8. The man living in the house right in the center drinks milk 
+       (l/fresh [ll lr rl rr]
+                (l/== rows [ll lr (vague-house :milk) rl rr]))
+       ;9. The Norwegian lives in the first house.
+       (l/fresh [a b c d]
+                (l/conde 
+                  [(l/== [(vague-house :norwegian) a b c d] rows)]
+                  [(l/== [a b c d (vague-house :norwegian)] rows)]
+                  ))
+       ;10. The man who smokes Blend lives next to the one who keeps cats 
+       (neighbors (vague-house :blend) (vague-house :cats) rows false)
+       ;11. The man who keeps horses lives next to the man who smokes Dunhill 
+       (neighbors (vague-house :horses) (vague-house :dunhill) rows false)
+       ;12. The owner who smokes Camel drinks beer 
+       (l/membero (vague-house :camel :beer) rows)
+       ;13. The German smokes Marlborough. 
+       (l/membero (vague-house :german :marlborough) rows)
+       ;14. The Norwegian lives next to the blue house 
+       (neighbors (vague-house :norwegian) (vague-house :blue) rows false)
+       ;15. The man who smokes Blend has a neighbour who drinks water.
+       (neighbors (vague-house :blend) (vague-house :water) rows false)
+       ; Capture the answer
+       (l/== q rows)       
+       ))))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-lazy-seq'>(</span>","close":"<span class='clj-lazy-seq'>)</span>","separator":" ","items":[{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:green</span>","value":":green"},{"type":"html","content":"<span class='clj-keyword'>:german</span>","value":":german"},{"type":"html","content":"<span class='clj-keyword'>:coffee</span>","value":":coffee"},{"type":"html","content":"<span class='clj-keyword'>:marlborough</span>","value":":marlborough"},{"type":"html","content":"<span class='clj-keyword'>:fish</span>","value":":fish"}],"value":"[:green :german :coffee :marlborough :fish]"},{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:white</span>","value":":white"},{"type":"html","content":"<span class='clj-keyword'>:swedish</span>","value":":swedish"},{"type":"html","content":"<span class='clj-keyword'>:beer</span>","value":":beer"},{"type":"html","content":"<span class='clj-keyword'>:camel</span>","value":":camel"},{"type":"html","content":"<span class='clj-keyword'>:dog</span>","value":":dog"}],"value":"[:white :swedish :beer :camel :dog]"},{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:red</span>","value":":red"},{"type":"html","content":"<span class='clj-keyword'>:british</span>","value":":british"},{"type":"html","content":"<span class='clj-keyword'>:milk</span>","value":":milk"},{"type":"html","content":"<span class='clj-keyword'>:pall-mall</span>","value":":pall-mall"},{"type":"html","content":"<span class='clj-keyword'>:birds</span>","value":":birds"}],"value":"[:red :british :milk :pall-mall :birds]"},{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:blue</span>","value":":blue"},{"type":"html","content":"<span class='clj-keyword'>:danish</span>","value":":danish"},{"type":"html","content":"<span class='clj-keyword'>:tea</span>","value":":tea"},{"type":"html","content":"<span class='clj-keyword'>:blend</span>","value":":blend"},{"type":"html","content":"<span class='clj-keyword'>:horses</span>","value":":horses"}],"value":"[:blue :danish :tea :blend :horses]"},{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-keyword'>:yellow</span>","value":":yellow"},{"type":"html","content":"<span class='clj-keyword'>:norwegian</span>","value":":norwegian"},{"type":"html","content":"<span class='clj-keyword'>:water</span>","value":":water"},{"type":"html","content":"<span class='clj-keyword'>:dunhill</span>","value":":dunhill"},{"type":"html","content":"<span class='clj-keyword'>:cats</span>","value":":cats"}],"value":"[:yellow :norwegian :water :dunhill :cats]"}],"value":"([:green :german :coffee :marlborough :fish] [:white :swedish :beer :camel :dog] [:red :british :milk :pall-mall :birds] [:blue :danish :tea :blend :horses] [:yellow :norwegian :water :dunhill :cats])"}
+;; <=
+
+;; @@
+
+;; @@

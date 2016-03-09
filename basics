@@ -1,0 +1,172 @@
+;; gorilla-repl.fileformat = 1
+
+;; **
+;;; Logic Programming in Clojure with core.logic
+;; **
+
+;; @@
+(ns logic.basics
+  (:require [gorilla-plot.core :as plot]
+            [clojure.core.logic :as l :refer [run conde membero permuteo fresh]]
+            ))
+;; @@
+;; =>
+;;; {"type":"html","content":"<span class='clj-nil'>nil</span>","value":"nil"}
+;; <=
+
+;; **
+;;; The basics of Logic Programming:
+;;; 
+;;; 
+;;;  Unification:
+;; **
+
+;; @@
+(run 1 [x] (l/== 2 x))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-lazy-seq'>(</span>","close":"<span class='clj-lazy-seq'>)</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"}],"value":"(2)"}
+;; <=
+
+;; @@
+(run 1 [x] (l/== [1 2 3] x))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-lazy-seq'>(</span>","close":"<span class='clj-lazy-seq'>)</span>","separator":" ","items":[{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>1</span>","value":"1"},{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"},{"type":"html","content":"<span class='clj-long'>3</span>","value":"3"}],"value":"[1 2 3]"}],"value":"([1 2 3])"}
+;; <=
+
+;; @@
+(run 1 [x] (l/== [1 2 3] [1 2 x]))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-lazy-seq'>(</span>","close":"<span class='clj-lazy-seq'>)</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>3</span>","value":"3"}],"value":"(3)"}
+;; <=
+
+;; **
+;;; Sometimes we are looking for counter examples
+;; **
+
+;; @@
+(run 1 [x] (l/== [1 2 x] [1 3 4]))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-lazy-seq'>(</span>","close":"<span class='clj-lazy-seq'>)</span>","separator":" ","items":[],"value":"()"}
+;; <=
+
+;; **
+;;; We can use more than one variable
+;; **
+
+;; @@
+(run 1 [x] (fresh [y]
+                  (l/== 1 y)
+                  (l/== y x)))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-lazy-seq'>(</span>","close":"<span class='clj-lazy-seq'>)</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>1</span>","value":"1"}],"value":"(1)"}
+;; <=
+
+;; **
+;;; We can verify symmetry
+;; **
+
+;; @@
+(run 1 [x] 
+     (l/== 1 x)
+     (l/== x 1))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-lazy-seq'>(</span>","close":"<span class='clj-lazy-seq'>)</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>1</span>","value":"1"}],"value":"(1)"}
+;; <=
+
+;; **
+;;; We can verify reflexivity, and see what an unbounded variable looks like
+;; **
+
+;; @@
+(run 1 [x] (l/== x x))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-lazy-seq'>(</span>","close":"<span class='clj-lazy-seq'>)</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-symbol'>_0</span>","value":"_0"}],"value":"(_0)"}
+;; <=
+
+;; **
+;;; We've looked at logical and, now time for logical or.
+;;; 
+;;; conde takes vectors like this: (conde [clause1 clause2] 
+;;;                                       [clause2])
+;;;                                       
+;;; and calculates (clause1 AND clause2) OR (clause3)
+;; **
+
+;; @@
+(run 3 [x]
+     (conde [(l/== 1 x)]
+            [(l/== 2 x)]))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-lazy-seq'>(</span>","close":"<span class='clj-lazy-seq'>)</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>1</span>","value":"1"},{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"}],"value":"(1 2)"}
+;; <=
+
+;; **
+;;; This is going to get crowded real quick. We can pull some of this out into a function.
+;; **
+
+;; @@
+(defn my-clause [x] (conde [(l/== 1 x)]
+                 [(l/== 2 x)]))
+
+(run 3 [x] (my-clause x))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-lazy-seq'>(</span>","close":"<span class='clj-lazy-seq'>)</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>1</span>","value":"1"},{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"}],"value":"(1 2)"}
+;; <=
+
+;; **
+;;; Unlike logPy, core.logic has support for multiple return values
+;; **
+
+;; @@
+(run 4 [x y] 
+     (my-clause x) 
+     (my-clause y))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-lazy-seq'>(</span>","close":"<span class='clj-lazy-seq'>)</span>","separator":" ","items":[{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>1</span>","value":"1"},{"type":"html","content":"<span class='clj-long'>1</span>","value":"1"}],"value":"[1 1]"},{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>1</span>","value":"1"},{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"}],"value":"[1 2]"},{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"},{"type":"html","content":"<span class='clj-long'>1</span>","value":"1"}],"value":"[2 1]"},{"type":"list-like","open":"<span class='clj-vector'>[</span>","close":"<span class='clj-vector'>]</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"},{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"}],"value":"[2 2]"}],"value":"([1 1] [1 2] [2 1] [2 2])"}
+;; <=
+
+;; **
+;;; That's everything you need to know to write any logic program that you want!
+;;; 
+;;; But... there are some clauses we'll be using to make things easier.
+;;; 
+;;; permuteo and membero were imported above
+;; **
+
+;; **
+;;; permuteo unifies two collections that are permutations of each other.
+;; **
+
+;; @@
+(run 6 [x] (permuteo [1 2 3] x))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-lazy-seq'>(</span>","close":"<span class='clj-lazy-seq'>)</span>","separator":" ","items":[{"type":"list-like","open":"<span class='clj-list'>(</span>","close":"<span class='clj-list'>)</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>1</span>","value":"1"},{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"},{"type":"html","content":"<span class='clj-long'>3</span>","value":"3"}],"value":"(1 2 3)"},{"type":"list-like","open":"<span class='clj-list'>(</span>","close":"<span class='clj-list'>)</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"},{"type":"html","content":"<span class='clj-long'>1</span>","value":"1"},{"type":"html","content":"<span class='clj-long'>3</span>","value":"3"}],"value":"(2 1 3)"},{"type":"list-like","open":"<span class='clj-list'>(</span>","close":"<span class='clj-list'>)</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>1</span>","value":"1"},{"type":"html","content":"<span class='clj-long'>3</span>","value":"3"},{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"}],"value":"(1 3 2)"},{"type":"list-like","open":"<span class='clj-list'>(</span>","close":"<span class='clj-list'>)</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"},{"type":"html","content":"<span class='clj-long'>3</span>","value":"3"},{"type":"html","content":"<span class='clj-long'>1</span>","value":"1"}],"value":"(2 3 1)"},{"type":"list-like","open":"<span class='clj-list'>(</span>","close":"<span class='clj-list'>)</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>3</span>","value":"3"},{"type":"html","content":"<span class='clj-long'>1</span>","value":"1"},{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"}],"value":"(3 1 2)"},{"type":"list-like","open":"<span class='clj-list'>(</span>","close":"<span class='clj-list'>)</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>3</span>","value":"3"},{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"},{"type":"html","content":"<span class='clj-long'>1</span>","value":"1"}],"value":"(3 2 1)"}],"value":"((1 2 3) (2 1 3) (1 3 2) (2 3 1) (3 1 2) (3 2 1))"}
+;; <=
+
+;; **
+;;; membero unifies a member of a collection, with a collection
+;; **
+
+;; @@
+(run 3 [x] (membero x [3 2 1]))
+
+(run 3 [x] (membero x '(1 2 3)))
+;; @@
+;; =>
+;;; {"type":"list-like","open":"<span class='clj-lazy-seq'>(</span>","close":"<span class='clj-lazy-seq'>)</span>","separator":" ","items":[{"type":"html","content":"<span class='clj-long'>1</span>","value":"1"},{"type":"html","content":"<span class='clj-long'>2</span>","value":"2"},{"type":"html","content":"<span class='clj-long'>3</span>","value":"3"}],"value":"(1 2 3)"}
+;; <=
+
+;; @@
+
+;; @@
